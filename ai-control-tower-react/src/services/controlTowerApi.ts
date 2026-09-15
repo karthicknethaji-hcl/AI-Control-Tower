@@ -99,6 +99,7 @@ export interface TraceDetailRow {
   span_type?: string | null;
   tool_name?: string | null;
   span_status?: string | null;
+  span_started_at?: string | null;
   span_duration_ms?: number | string | null;
   calculated_cost?: number | string | null;
   request_bytes?: number | string | null;
