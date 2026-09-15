@@ -77,6 +77,50 @@ function csvValue(value: unknown) {
   const text = value === null || value === undefined ? "" : String(value);
   return `"${text.replace(/"/g, '""')}"`;
 }
+
+function OpportunityMatrix({ params }: { params: RpcParams }) {
+  const query = useQuery({
+    queryKey: ["cost-analytics", "opportunity-matrix", params.companyId, params.appId, params.periodStart, params.periodEnd],
+    queryFn: () => getGroupedCost(params, "feature"),
+  });
+  const points = (query.data ?? []).map((row) => {
+    const calls = numeric(row, "call_count", "calls", "total_calls") ?? 0;
+    const cost = rowCost(row) ?? 0;
+    return { name: rowLabel(row), calls, cost, avgCost: calls > 0 ? cost / calls : 0 };
+  }).filter((point) => point.calls > 0);
+  const overallAvg = points.length ? points.reduce((sum, point) => sum + point.avgCost, 0) / points.length : 0;
+  const maxCalls = Math.max(1, ...points.map((point) => point.calls));
+  const maxAvgCost = Math.max(1, ...points.map((point) => point.avgCost));
+  const costs = points.map((point) => point.cost);
+  const minCost = Math.min(0, ...costs);
+  const maxCost = Math.max(1, ...costs);
+
+  return <Card className="panel opportunity-matrix-card">
+    <SectionTitle title="Opportunity Matrix" detail="Call volume, average cost per call, and total spend by feature" />
+    {query.isLoading ? <EmptyState>Loading opportunity data...</EmptyState> : query.error ? <EmptyState>Opportunity data could not be loaded.</EmptyState> : !points.length ? <EmptyState>No feature cost data is available for this period.</EmptyState> : <>
+      <p className="matrix-help">The X-axis is call volume, the Y-axis is average cost per call, and bubble size represents total spend. Red bubbles are above 1.5x the cross-feature average.</p>
+      <div className="opportunity-matrix" role="img" aria-label="Opportunity matrix showing call volume against average cost per call">
+        <div className="matrix-quadrant-label matrix-quadrant-top-left">High cost / low volume</div>
+        <div className="matrix-quadrant-label matrix-quadrant-top-right">High cost / high volume</div>
+        <div className="matrix-quadrant-label matrix-quadrant-bottom-left">Low cost / low volume</div>
+        <div className="matrix-quadrant-label matrix-quadrant-bottom-right">Low cost / high volume</div>
+        <div className="matrix-axis matrix-axis-x">Call volume →</div>
+        <div className="matrix-axis matrix-axis-y">Avg cost / call →</div>
+        {points.map((point) => {
+          const left = 8 + (point.calls / maxCalls) * 84;
+          const bottom = 8 + (point.avgCost / maxAvgCost) * 84;
+          const size = 18 + (maxCost > minCost ? ((point.cost - minCost) / (maxCost - minCost)) * 28 : 14);
+          const flagged = point.avgCost > overallAvg * 1.5;
+          return <div className={`matrix-point ${flagged ? "flagged" : ""}`} key={point.name} style={{ left: `${left}%`, bottom: `${bottom}%`, width: size, height: size }} tabIndex={0} title={`${point.name}: ${compactNumber(point.calls)} calls, ${money(point.cost)} total, ${money(point.avgCost)} average cost/call`}>
+            <span className="matrix-tooltip"><b>{point.name}</b>{compactNumber(point.calls)} calls · {money(point.cost)} total<br />{money(point.avgCost)} avg cost/call</span>
+            <span className="matrix-point-label">{point.name}</span>
+          </div>;
+        })}
+      </div>
+      <div className="matrix-legend"><span><i className="matrix-legend-dot flagged" />Flagged (&gt;1.5x average)</span><span><i className="matrix-legend-dot" />Normal</span><span>Bubble size = total spend</span></div>
+    </>}
+  </Card>;
+}
 function downloadRequestCsv(
   rows: Awaited<ReturnType<typeof getAllCostEvents>>,
 ) {
@@ -572,6 +616,7 @@ export function CostAnalyticsPage({
           />
         ))}
       </div>
+      <OpportunityMatrix params={params} />
       <RequestExplorer
         params={params}
         canInspectTrace={canInspectTrace}

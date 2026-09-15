@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CircleDollarSign, X } from 'lucide-react';
-import { acknowledgeAlert, dismissAlert, getAlerts, getBudget, getCostSummary, getGroupedCost, getOpportunities, getOpportunitySupportingCalls, upsertBudget } from '../../services/controlTowerApi';
-import type { AlertRow, BudgetRow, OpportunityRow } from '../../services/controlTowerApi';
+import { acknowledgeAlert, dismissAlert, getAlerts, getBudget, getCostSummary, upsertBudget } from '../../services/controlTowerApi';
+import type { AlertRow, BudgetRow } from '../../services/controlTowerApi';
 import type { RpcParams } from '../../types';
 import { compactNumber, money } from '../../lib/utils';
 import { Badge, Button, Card, EmptyState, SectionTitle } from '../../components/ui';
@@ -13,6 +13,102 @@ function field(row: Record<string, unknown> | null | undefined, ...keys: string[
 
 function BudgetDialog({ params, budget, onClose }: { params: RpcParams; budget: BudgetRow | null; onClose: () => void }) { const client = useQueryClient(); const [amount, setAmount] = useState(budget?.amount == null ? '' : String(budget.amount)); const [warn, setWarn] = useState(budget?.warn_threshold_pct == null ? '' : String(budget.warn_threshold_pct)); const [escalate, setEscalate] = useState(budget?.escalate_threshold_pct == null ? '' : String(budget.escalate_threshold_pct)); const mutation = useMutation({ mutationFn: () => upsertBudget(params, { amount: Number(amount), warnThresholdPct: Number(warn), escalateThresholdPct: Number(escalate), actionOnBreach: budget?.action_on_breach ?? 'notify' }), onSuccess: () => { client.invalidateQueries({ queryKey: ['governance', 'budget'] }); onClose(); } }); return <div className="drawer-backdrop" onClick={onClose}><div className="drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-head"><div><Badge>Governance Control</Badge><h2>Budget Controls</h2></div><button className="icon-close" aria-label="Close budget controls" onClick={onClose}><X size={17} /></button></div><div className="space-y-4"><label className="block text-[11px] font-extrabold text-text">Monthly Budget<input type="number" value={amount} onChange={(event) => setAmount(event.target.value)} className="mt-2 w-full rounded-control border border-line bg-soft px-3 py-2 text-[12px]" /></label><label className="block text-[11px] font-extrabold text-text">Warn Threshold %<input type="number" value={warn} onChange={(event) => setWarn(event.target.value)} className="mt-2 w-full rounded-control border border-line bg-soft px-3 py-2 text-[12px]" /></label><label className="block text-[11px] font-extrabold text-text">Escalate Threshold %<input type="number" value={escalate} onChange={(event) => setEscalate(event.target.value)} className="mt-2 w-full rounded-control border border-line bg-soft px-3 py-2 text-[12px]" /></label><p className="text-[10px] font-semibold text-muted">Save calls the existing budget upsert RPC. Do not save during smoke validation.</p>{mutation.error && <EmptyState>Budget update failed. The RPC returned an error.</EmptyState>}<Button disabled={mutation.isPending} onClick={() => mutation.mutate()} className="bg-purple text-white">{mutation.isPending ? 'Saving...' : 'Save Configuration'}</Button></div></div></div>; }
 
-function SupportingCalls({ params, opportunity, onClose }: { params: RpcParams; opportunity: OpportunityRow; onClose: () => void }) { const feature = String(opportunity.feature ?? ''); const query = useQuery({ queryKey: ['governance', 'supporting-calls', params.companyId, params.appId, params.periodStart, params.periodEnd, feature], enabled: Boolean(feature), queryFn: () => getOpportunitySupportingCalls(params, feature, 5) }); return <div className="drawer-backdrop" onClick={onClose}><div className="drawer" onClick={(event) => event.stopPropagation()}><div className="drawer-head"><div><Badge>Live Opportunity Detail</Badge><h2>Supporting Calls</h2></div><button className="icon-close" aria-label="Close supporting calls" onClick={onClose}><X size={17} /></button></div>{query.isLoading ? <EmptyState>Loading supporting calls...</EmptyState> : query.error ? <EmptyState>Supporting calls could not be loaded.</EmptyState> : !query.data?.length ? <EmptyState>No supporting calls were returned.</EmptyState> : <div className="list">{query.data.map((call, index) => <div className="list-row" key={String(call.usage_event_id ?? call.request_started_at ?? index)}><span>{String(call.caller ?? call.feature ?? 'Call')}</span><strong>{money(numeric(call, 'calculated_cost', 'cost'))}</strong></div>)}</div>}</div></div>; }
+function WhatIfDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [users, setUsers] = useState(5);
+  const [products, setProducts] = useState(2);
+  const [intensity, setIntensity] = useState(100);
+  if (!open) return null;
+  const projected = Math.max(12, Math.round(users * 18 + products * 24 + (intensity - 100) * 1.6));
+  return <div className="drawer-backdrop" onClick={onClose}>
+    <div className="drawer" onClick={(event) => event.stopPropagation()}>
+      <div className="drawer-head"><div><Badge>New</Badge><h2>What-if scenario</h2></div><button className="icon-close" aria-label="Close what-if scenario" onClick={onClose}><X size={17} /></button></div>
+      <div className="space-y-4">
+        <label className="block text-[11px] font-extrabold text-text">Additional users <span className="text-muted">{users}</span><input type="range" min="0" max="25" value={users} onChange={(event) => setUsers(Number(event.target.value))} className="mt-2 w-full" /></label>
+        <label className="block text-[11px] font-extrabold text-text">Additional products <span className="text-muted">{products}</span><input type="range" min="0" max="10" value={products} onChange={(event) => setProducts(Number(event.target.value))} className="mt-2 w-full" /></label>
+        <label className="block text-[11px] font-extrabold text-text">Usage intensity <span className="text-muted">{intensity}%</span><input type="range" min="50" max="200" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))} className="mt-2 w-full" /></label>
+        <div className="cc-callout cc-callout-action"><b>Projected add-on cost:</b><p>+${projected} / month</p></div>
+      </div>
+    </div>
+  </div>;
+}
 
-export function GovernancePage({ params, onOpen: _onOpen }: { params: RpcParams; onOpen: (title: string, content?: ReactNode) => void }) { const [budgetOpen, setBudgetOpen] = useState(false); const [supporting, setSupporting] = useState<OpportunityRow | null>(null); const client = useQueryClient(); const context = [params.companyId, params.appId, params.periodStart, params.periodEnd]; const budget = useQuery({ queryKey: ['governance', 'budget', params.companyId, params.appId], queryFn: () => getBudget(params) }); const alerts = useQuery({ queryKey: ['governance', 'alerts', params.companyId, params.appId], queryFn: () => getAlerts(params) }); const opportunities = useQuery({ queryKey: ['governance', 'opportunities', ...context], queryFn: () => getOpportunities(params) }); const summary = useQuery({ queryKey: ['governance', 'summary', ...context], queryFn: () => getCostSummary(params) }); const grouped = useQuery({ queryKey: ['governance', 'grouped', ...context, 'user_role'], queryFn: () => getGroupedCost(params, 'user_role') }); const ack = useMutation({ mutationFn: (id: string) => acknowledgeAlert(id), onSuccess: () => client.invalidateQueries({ queryKey: ['governance', 'alerts'] }) }); const dismiss = useMutation({ mutationFn: (id: string) => dismissAlert(id), onSuccess: () => client.invalidateQueries({ queryKey: ['governance', 'alerts'] }) }); const row = summary.data?.[0] ?? {}; const totalSpend = numeric(row, 'total_cost'); const failedCalls = numeric(row, 'failed_calls'); const failedCost = numeric(row, 'failed_cost'); const unpriced = numeric(row, 'unpriced_calls', 'unpriced_call_count'); const nullTokens = numeric(row, 'null_token_calls'); const variance = numeric(row, 'model_variance_calls'); return <><div className="page-intro"><div><Badge className="bg-amberP text-amber">Admin and Member Access</Badge><p>Manage budget posture, alerts, enforcement, and optimization decisions.</p></div><Badge className="bg-soft text-muted">Live Governance RPC Data</Badge></div><div className="metric-grid four"><MetricCard label="Total Spend" value={money(totalSpend)} detail="Current period" tone="blue" /><MetricCard label="Failed Calls" value={compactNumber(failedCalls)} detail={failedCost === undefined ? 'Failure cost unavailable' : money(failedCost)} tone="red" /><MetricCard label="Unpriced Calls" value={compactNumber(unpriced)} detail="Summary field" tone="amber" /><MetricCard label="Model Variance" value={compactNumber(variance)} detail={nullTokens === undefined ? 'Null-token field unavailable' : `${nullTokens} null-token calls`} tone="purple" /></div><div className="two-column"><Card className="panel"><SectionTitle title="Budget Posture" detail="Loaded from mt_ai_budget_get_active" />{budget.isLoading ? <EmptyState>Loading budget posture...</EmptyState> : budget.error ? <EmptyState>Budget posture could not be loaded.</EmptyState> : budget.data ? <div className="list"><div className="list-row"><span>Monthly Budget</span><strong>{money(numeric(budget.data, 'amount'))}</strong></div><div className="list-row"><span>Warn Threshold</span><strong>{field(budget.data, 'warn_threshold_pct')}%</strong></div><div className="list-row"><span>Escalate Threshold</span><strong>{field(budget.data, 'escalate_threshold_pct')}%</strong></div><div className="list-row"><span>Action on Breach</span><strong>{field(budget.data, 'action_on_breach')}</strong></div></div> : <EmptyState>No active budget is configured.</EmptyState>}<Button className="mt-4" onClick={() => setBudgetOpen(true)}>Budget Controls</Button></Card><Card className="panel"><SectionTitle title="Governance Grouping" detail="Role/user grouping where returned" />{grouped.isLoading ? <EmptyState>Loading role economics...</EmptyState> : grouped.error ? <EmptyState>Role grouping could not be loaded.</EmptyState> : !grouped.data?.length ? <EmptyState>No role/user governance grouping is available.</EmptyState> : <div className="list">{grouped.data.slice(0, 8).map((item, index) => <div className="list-row" key={`${item.group_key1 ?? index}`}><span>{String(item.group_key1 ?? 'Unlabelled')}</span><strong>{money(numeric(item, 'cost'))}</strong></div>)}</div>}</Card></div><Card className="panel"><SectionTitle title="Alerts" detail="Acknowledge or dismiss actions are persistent" />{alerts.isLoading ? <EmptyState>Loading alerts...</EmptyState> : alerts.error ? <EmptyState>Alerts could not be loaded.</EmptyState> : !alerts.data?.length ? <EmptyState><AlertTriangle size={18} className="mx-auto mb-2 text-amber" />No active alerts for this app.</EmptyState> : <div className="list">{alerts.data.map((alert: AlertRow, index) => <div className="list-row" key={String(alert.alert_id ?? index)}><span><strong className="block">{field(alert, 'threshold_type')} threshold</strong><small className="text-[9px] text-muted">{field(alert, 'threshold_pct')}% · {field(alert, 'status')}</small></span><span className="flex gap-2"><Button disabled={ack.isPending} onClick={() => ack.mutate(String(alert.alert_id))} className="px-2 py-1 text-[10px]">Acknowledge</Button><Button disabled={dismiss.isPending} onClick={() => dismiss.mutate(String(alert.alert_id))} className="px-2 py-1 text-[10px]">Dismiss</Button></span></div>)}</div>}</Card><Card className="panel"><SectionTitle title="Optimization Opportunities" detail="Backed by mt_ai_cost_opportunities" />{opportunities.isLoading ? <EmptyState>Loading opportunities...</EmptyState> : opportunities.error ? <EmptyState>Opportunities could not be loaded.</EmptyState> : !opportunities.data?.length ? <EmptyState><CircleDollarSign size={18} className="mx-auto mb-2 text-green" />No optimization opportunities are available.</EmptyState> : <div className="list">{opportunities.data.map((opportunity, index) => <div className="list-row" key={`${String(opportunity.feature ?? opportunity.title ?? index)}`}><span><strong className="block">{String(opportunity.title ?? opportunity.feature ?? 'Opportunity')}</strong><small className="text-[9px] text-muted">{money(numeric(opportunity, 'savings', 'estimated_savings'))}</small></span>{opportunity.feature && <Button onClick={() => setSupporting(opportunity)} className="px-2 py-1 text-[10px]">Supporting Calls</Button>}</div>)}</div>}</Card>{budgetOpen && <BudgetDialog params={params} budget={budget.data ?? null} onClose={() => setBudgetOpen(false)} />}{supporting && <SupportingCalls params={params} opportunity={supporting} onClose={() => setSupporting(null)} />}</>; }
+export function GovernancePage({ params, onOpen: _onOpen }: { params: RpcParams; onOpen: (title: string, content?: ReactNode) => void }) {
+  const [budgetOpen, setBudgetOpen] = useState(false);
+  const [whatIfOpen, setWhatIfOpen] = useState(false);
+  const client = useQueryClient();
+  const budget = useQuery({ queryKey: ['governance', 'budget', params.companyId, params.appId], queryFn: () => getBudget(params) });
+  const alerts = useQuery({ queryKey: ['governance', 'alerts', params.companyId, params.appId], queryFn: () => getAlerts(params) });
+  const summary = useQuery({ queryKey: ['governance', 'summary', params.companyId, params.appId, params.periodStart, params.periodEnd], queryFn: () => getCostSummary(params) });
+  const ack = useMutation({ mutationFn: (id: string) => acknowledgeAlert(id), onSuccess: () => client.invalidateQueries({ queryKey: ['governance', 'alerts'] }) });
+  const dismiss = useMutation({ mutationFn: (id: string) => dismissAlert(id), onSuccess: () => client.invalidateQueries({ queryKey: ['governance', 'alerts'] }) });
+  const row = summary.data?.[0] ?? {};
+  const totalSpend = numeric(row, 'total_cost');
+  const budgetAmount = numeric((budget.data ?? undefined) as Record<string, unknown> | undefined, 'amount');
+  const budgetUsed = budgetAmount && totalSpend !== undefined && budgetAmount > 0 ? Math.min((totalSpend / budgetAmount) * 100, 100) : 0;
+  const alertRows = alerts.data ?? [];
+
+  return <>
+    <div className="page-intro">
+      <div>
+        <Badge className="bg-amberP text-amber">Admin and Member Access</Badge>
+        <p>Budget posture analysis, alert responses, and enforcement decisions for this app.</p>
+      </div>
+    </div>
+
+    <div className="hero">
+      <Card className="panel">
+        <div className="panel-head">
+          <div>
+            <div className="eyebrow">Budget posture</div>
+            <div className="panel-title">Monthly AI budget</div>
+            <div className="panel-desc">Controls, thresholds, and action-on-breach remain here. Cost breakdown stays in Cost Analytics.</div>
+          </div>
+          <span className={`pill ${budgetUsed >= 90 ? 'amber' : 'green'}`}>{budgetAmount && totalSpend !== undefined ? `${Math.round(budgetUsed)}% used` : 'No budget'}</span>
+        </div>
+
+        <div className="panel-pad">
+          <div className="budgetbar"><span style={{ width: `${budgetAmount && totalSpend !== undefined ? Math.min(Math.round(budgetUsed), 100) : 0}%` }} /></div>
+
+          <div className="grid-4" style={{ marginTop: '14px' }}>
+            <div className="mini"><span>Spend MTD</span><b>{money(totalSpend)}</b></div>
+            <div className="mini"><span>Budget</span><b>{budgetAmount ? money(budgetAmount) : '—'}</b></div>
+            <div className="mini"><span>Warning</span><b>{budget.data ? `${field(budget.data, 'warn_threshold_pct') ?? '—'}%` : '—'}</b></div>
+            <div className="mini"><span>Escalate</span><b>{budget.data ? `${field(budget.data, 'escalate_threshold_pct') ?? '—'}%` : '—'}</b></div>
+          </div>
+
+          <div className="gov-actions-row" style={{ marginTop: '14px' }}>
+            <button type="button" className="btn-primary" onClick={() => setBudgetOpen(true)}>Update controls</button>
+            <button type="button" className="btn-secondary" onClick={() => setWhatIfOpen(true)}>Run what-if<span className="tag-new">New</span></button>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="panel">
+        <div className="panel-head">
+          <div>
+            <div className="eyebrow">Alerts</div>
+            <div className="panel-title">Open governance alerts</div>
+          </div>
+        </div>
+
+        <div className="panel-pad action-list">
+          {alerts.isLoading ? <EmptyState>Loading alerts...</EmptyState> : alerts.error ? <EmptyState>Alerts could not be loaded.</EmptyState> : !alertRows.length ? <EmptyState><AlertTriangle size={18} className="mx-auto mb-2 text-amber" />No active alerts for this app.</EmptyState> : alertRows.slice(0, 3).map((alert: AlertRow, index) => <div className="action-row" key={String(alert.alert_id ?? index)}>
+            <div className="action-ic"><AlertTriangle size={12} /></div>
+            <div>
+              <b>{field(alert, 'threshold_type')} threshold</b>
+              <p>{field(alert, 'threshold_pct')}% · {field(alert, 'status')}</p>
+            </div>
+            <div className="action-arrow" style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" className="btn-small" onClick={() => ack.mutate(String(alert.alert_id))}>Ack</button>
+              <button type="button" className="btn-small" onClick={() => dismiss.mutate(String(alert.alert_id))}>Dismiss</button>
+            </div>
+          </div>)}
+        </div>
+      </Card>
+    </div>
+
+    {budgetOpen && <BudgetDialog params={params} budget={budget.data ?? null} onClose={() => setBudgetOpen(false)} />}
+    {whatIfOpen && <WhatIfDialog open={whatIfOpen} onClose={() => setWhatIfOpen(false)} />}
+  </>;
+}
+
