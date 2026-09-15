@@ -1,5 +1,6 @@
 import type { CompanyApp, RpcParams } from '../types';
 import { getSupabase } from '../lib/supabase';
+import { money } from '../lib/utils';
 
 export interface CostSummaryRow {
   total_cost?: number | string | null;
@@ -138,7 +139,66 @@ export interface OpportunityRow {
   feature?: string | null;
   savings?: number | string | null;
   estimated_savings?: number | string | null;
+  evidence?: string | null;
+  confidence?: string | null;
+  recommendation?: string | null;
+  segmentCount?: number | string | null;
+  currentTier?: string | null;
+  candidateTier?: string | null;
   [key: string]: unknown;
+}
+
+// Same thresholds/segment size the legacy Cost Tower client uses to map mt_ai_cost_opportunities' raw rows (opp_type 1/2) into a readable title, evidence, confidence, and recommendation.
+const OPPORTUNITY_SMALL_SEGMENT_PCT = 0.4;
+const CONFIDENCE_HIGH_MIN = 1000;
+const CONFIDENCE_MEDIUM_MIN = 200;
+const TIER_LABEL: Record<string, string> = { economical: 'Economical', balanced: 'Balanced', frontier: 'Frontier' };
+
+function tierLabel(tier: unknown) {
+  if (tier === null || tier === undefined || tier === '') return 'Untiered';
+  return TIER_LABEL[String(tier).toLowerCase()] ?? String(tier);
+}
+
+function confidenceTier(count: number): 'High' | 'Medium' | 'Low' {
+  if (count > CONFIDENCE_HIGH_MIN) return 'High';
+  if (count >= CONFIDENCE_MEDIUM_MIN) return 'Medium';
+  return 'Low';
+}
+
+function mapOpportunityRow(row: Record<string, unknown>): OpportunityRow {
+  const oppType = Number(row.opp_type ?? row.type);
+  const segmentCount = Number(row.segment_count ?? row.segmentCount ?? 0);
+  const feature = String(row.feature ?? '');
+  if (oppType === 1) {
+    const currentTier = tierLabel(row.current_tier);
+    const candidateTier = tierLabel(row.candidate_tier);
+    const smallPct = Math.round(OPPORTUNITY_SMALL_SEGMENT_PCT * 100);
+    return {
+      ...row, type: 1, feature, savings: Number(row.savings),
+      title: `${feature} Intake Routing`,
+      evidence: `The smallest ${smallPct}% of ${feature} calls by request size still route through ${currentTier} tier, alongside its larger calls. That segment covers ${segmentCount} qualifying calls this period.`,
+      confidence: confidenceTier(segmentCount),
+      segmentCount,
+      currentTier: String(row.current_tier ?? ''),
+      candidateTier: String(row.candidate_tier ?? ''),
+      recommendation: `Route the smallest ${smallPct}% of ${feature} calls by request size to the ${candidateTier} tier instead of ${currentTier}. This re-tiers ${segmentCount} calls without touching the larger requests that need ${currentTier}.`,
+    };
+  }
+  if (oppType === 2) {
+    const currentAvg = Number(row.current_avg_cost);
+    const baselineAvg = Number(row.baseline_avg_cost);
+    const currentVersion = String(row.current_version ?? 'the current version');
+    const baselineVersion = String(row.baseline_version ?? 'the prior version');
+    return {
+      ...row, type: 2, feature, savings: Number(row.savings),
+      title: `Prompt Version ${currentVersion} Review`,
+      evidence: `${currentVersion} shows a higher avg cost/call (${money(currentAvg)}) than the immediately preceding version ${baselineVersion} (${money(baselineAvg)}) for ${feature}.`,
+      confidence: confidenceTier(segmentCount),
+      segmentCount,
+      recommendation: `Diff prompt version ${currentVersion} against ${baselineVersion} for ${feature} and roll back or fix whichever change is driving the ${money(currentAvg - baselineAvg)} per-call increase.`,
+    };
+  }
+  return row as OpportunityRow;
 }
 
 export async function listCompanyApps(companyId: string): Promise<CompanyApp[]> {
@@ -189,10 +249,11 @@ export async function getAlerts(params: RpcParams): Promise<AlertRow[]> {
 }
 
 export async function getOpportunities(params: RpcParams): Promise<OpportunityRow[]> {
-  return rpc<OpportunityRow>('mt_ai_cost_opportunities', {
+  const rows = await rpc<Record<string, unknown>>('mt_ai_cost_opportunities', {
     p_company_id: params.companyId, p_app_id: params.appId,
     p_period_start: params.periodStart, p_period_end: params.periodEnd,
   });
+  return rows.map(mapOpportunityRow).sort((a, b) => (Number(b.savings) || 0) - (Number(a.savings) || 0));
 }
 
 export async function upsertBudget(params: RpcParams, input: { amount: number; warnThresholdPct: number; escalateThresholdPct: number; actionOnBreach: string }): Promise<BudgetRow | null> {

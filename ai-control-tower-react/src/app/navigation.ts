@@ -11,13 +11,19 @@ export const navItems: NavigationItem[] = [
   { key: 'governance', label: 'Governance', sub: 'Budget and controls', icon: ShieldCheck },
 ];
 
-export const periods = ['This Month', 'Last Month', 'Last 3 Months', 'Overall'];
+export const CUSTOM_RANGE_OPTION = 'Custom Range...';
+export const periods = ['This Month', 'Last Month', 'Last 3 Months', 'Overall', CUSTOM_RANGE_OPTION];
 
-export function periodRange(period: string) {
+export interface CustomRange { start: string; end: string; }
+
+export function periodRange(period: string, custom?: CustomRange | null) {
   const now = new Date();
   let start: Date;
   let end: Date;
-  if (period === 'Last Month') {
+  if (period === CUSTOM_RANGE_OPTION && custom) {
+    start = new Date(`${custom.start}T00:00:00`);
+    end = new Date(`${custom.end}T23:59:59.999`);
+  } else if (period === 'Last Month') {
     start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     end = new Date(now.getFullYear(), now.getMonth(), 1);
   } else if (period === 'Last 3 Months') {
@@ -31,4 +37,12 @@ export function periodRange(period: string) {
     end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   }
   return { periodStart: start.toISOString(), periodEnd: end.toISOString() };
+}
+
+export function periodLabel(period: string, custom?: CustomRange | null) {
+  if (period === CUSTOM_RANGE_OPTION && custom) {
+    const format = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${format(custom.start)} – ${format(custom.end)}`;
+  }
+  return period;
 }
