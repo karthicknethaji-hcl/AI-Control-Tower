@@ -17,6 +17,7 @@ export interface CostSummaryRow {
   model_variance_calls?: number | string | null;
   failed_calls?: number | string | null;
   failed_cost?: number | string | null;
+  cache_savings?: number | string | null;
   [key: string]: unknown;
 }
 
@@ -302,6 +303,21 @@ export async function getCostEvents(params: RpcParams, limit = 50, offset = 0): 
   if (error) throw error;
   const rows = (data ?? []) as CostEventRow[];
   return { rows, totalCount: rows[0]?.total_row_count == null ? rows.length : Number(rows[0].total_row_count) };
+}
+
+export async function getAllCostEvents(params: RpcParams): Promise<CostEventRow[]> {
+  const pageSize = 100;
+  const rows: CostEventRow[] = [];
+  let offset = 0;
+  let totalCount = 0;
+  do {
+    const page = await getCostEvents(params, pageSize, offset);
+    rows.push(...page.rows);
+    totalCount = page.totalCount;
+    offset += page.rows.length;
+    if (page.rows.length === 0) break;
+  } while (rows.length < totalCount);
+  return rows;
 }
 
 export async function getTraceDetails(params: RpcParams): Promise<TraceDetailRow[]> {
