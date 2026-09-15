@@ -4,7 +4,7 @@ import { ArrowUpRight, CircleDollarSign, Eye, GitBranch, Lightbulb } from 'lucid
 import { getAlerts, getBudget, getCostByAgent, getCostSummary, getGroupedCost, getOpportunities, getOpportunitySupportingCalls } from '../../services/controlTowerApi';
 import type { CostSummaryRow, OpportunityRow } from '../../services/controlTowerApi';
 import type { NavKey, RpcParams } from '../../types';
-import { compactNumber, money } from '../../lib/utils';
+import { compactNumber, money, previousRange } from '../../lib/utils';
 import { Badge, Card, EmptyState, SectionTitle } from '../../components/ui';
 import { MetricCard } from '../../components/common/MetricCard';
 
@@ -26,13 +26,6 @@ function QueryState({ isLoading, error, empty, children }: { isLoading: boolean;
   if (error) return <EmptyState>Live data could not be loaded for this period.</EmptyState>;
   if (empty) return <EmptyState>No live data is available for this app and period.</EmptyState>;
   return <>{children}</>;
-}
-
-function previousRange(params: RpcParams) {
-  const start = new Date(params.periodStart).getTime();
-  const end = new Date(params.periodEnd).getTime();
-  const duration = Math.max(end - start, 0);
-  return { periodStart: new Date(start - duration).toISOString(), periodEnd: new Date(start).toISOString() };
 }
 
 function tierLabel(tier: unknown) {
