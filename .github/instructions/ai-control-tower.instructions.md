@@ -60,6 +60,8 @@ Do not rename or replace these without explicit approval:
 - `mt_ai_alert_dismiss`
 - `mt_ai_cost_opportunities`
 - `mt_ai_cost_opportunity_supporting_calls`
+- `mt_ai_record_usage_event_with_span` (Ingestion API `/v1/usage-events` write path, ported into `ai-control-tower-proxy`)
+- `mt_ai_record_tool_span` (Ingestion API `/v1/tool-spans` write path, ported into `ai-control-tower-proxy`)
 
 ## Confirmed data model concepts
 
@@ -94,3 +96,13 @@ Outcome types are app-defined. Product Studio currently has a known outcome cata
 ## New capability handling
 
 If a feature is not supported by existing RPCs or code behavior, either remove it from the implementation or visibly tag/comment it as `New`. Do not silently implement mock behavior as production behavior.
+
+## AI Control Tower proxy OpenAPI docs
+
+`ai-control-tower-proxy` self-documents via `swagger-jsdoc`, not a hand-edited
+YAML file. Every route handler added to `ai-control-tower-proxy/routes/**/*.js`
+(Settings API or Ingestion API `/v1/*`) MUST include an `@openapi` JSDoc block
+directly above it — that block is what generates `/docs`; there is no separate
+manual doc-update step. See `ai-control-tower-proxy/README.md`'s "API docs"
+section and `ai-control-tower-proxy/openapi/definition.js` for the shared
+info/servers/security scheme declarations.

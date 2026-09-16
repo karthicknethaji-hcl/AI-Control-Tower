@@ -1841,6 +1841,21 @@ https://pgt-proxy-dev.onrender.com/docs/
 
 That URL may be used only as the dev environment value.
 
+### 14.3 Docs source of truth (2026-09-16 update)
+
+The Ingestion API (`/v1/*`) is now also implemented natively in
+`ai-control-tower-proxy` (ported from Product-Studio-v9.37.01/proxy, same
+Supabase tables/RPCs, run in parallel — Product Studio's own `/v1` routes
+are unmodified and keep running; retiring them is a future, separate,
+explicit-approval-required step, not done as part of this change).
+
+`ai-control-tower-proxy` serves its own `/docs` (Redoc + `openapi.json`),
+built by `swagger-jsdoc` from `@openapi` JSDoc blocks above every route
+handler in `routes/**/*.js` (both the Ingestion API and the Settings API) —
+live-generated on every process start, not a static copied YAML file. See
+`ai-control-tower-proxy/README.md`'s "API docs" section for the convention:
+every new route must carry its own `@openapi` block.
+
 ---
 
 ## 15. Types and frontend service contracts
