@@ -123,15 +123,15 @@ BEGIN
   v_app_id := v_slug || '-' || v_suffix;
 
   IF EXISTS (
-    SELECT 1 FROM public.mt_company_apps
-    WHERE company_id = p_company_id AND app_id = v_app_id AND is_active = true
+    SELECT 1 FROM public.mt_company_apps ca
+    WHERE ca.company_id = p_company_id AND ca.app_id = v_app_id AND ca.is_active = true
   ) THEN
     RAISE EXCEPTION 'An app with this name is already connected for your company.';
   END IF;
 
   INSERT INTO public.mt_apps (app_id, name, supports_enforcement)
   VALUES (v_app_id, trim(p_display_name), false)
-  ON CONFLICT (app_id) DO UPDATE SET name = EXCLUDED.name;
+  ON CONFLICT ON CONSTRAINT mt_apps_pkey DO UPDATE SET name = EXCLUDED.name;
 
   INSERT INTO public.mt_company_apps (
     company_id, app_id, is_active, granted_at, granted_by,
@@ -144,7 +144,7 @@ BEGIN
     true, true, false, false, null, null,
     null, null, null, null, null
   )
-  ON CONFLICT (company_id, app_id) DO UPDATE SET
+  ON CONFLICT ON CONSTRAINT mt_company_apps_pkey DO UPDATE SET
     is_active = true, granted_at = now(), granted_by = p_actor_user_id,
     scope_usage_write = true, scope_traces_write = true,
     scope_payloads_write = false, payload_capture_enabled = false,

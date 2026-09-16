@@ -354,8 +354,8 @@ async function settingsRequest<T>(path: string, options: RequestInit = {}): Prom
     ...options,
     headers: { 'Content-Type': 'application/json', 'X-Auth-Token': session.access_token, ...(options.headers ?? {}) },
   });
-  const body = await response.json() as T & { error?: { message?: string } };
-  if (!response.ok) throw new Error(body.error?.message ?? 'Settings request failed.');
+  const body = await response.json() as T & { error?: { message?: string; type?: string } };
+  if (!response.ok) throw new Error(body.error?.message ? `${body.error.message} (HTTP ${response.status})` : `Settings request failed (HTTP ${response.status}).`);
   return body;
 }
 

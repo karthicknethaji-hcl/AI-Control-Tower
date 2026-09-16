@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ChevronDown, FileSearch, Search } from 'lucide-react';
+import { Activity, ChevronDown, FileSearch, Layers, Search } from 'lucide-react';
 import { getCostEvents, getTraceDetails, getTracePayload } from '../../services/controlTowerApi';
 import type { CostEventRow, TraceDetailRow, TracePayloadRow } from '../../services/controlTowerApi';
 import type { RpcParams } from '../../types';
@@ -56,7 +56,7 @@ export function TraceExplorerPage({ params, canInspectTrace, initialTraceId, onO
     <Card className="trace-layout">
       <div className="trace-list">
         <SectionTitle title="Request / Trace List" detail={listDetail} />
-        {isLoadingList ? <EmptyState>Loading requests...</EmptyState> : listError ? <EmptyState>Request list could not be loaded.</EmptyState> : !hasRows ? <EmptyState><Activity size={20} className="mx-auto mb-2 text-purple" />{searchTerm ? 'No traces match this search.' : 'No requests with trace IDs are available for this app and period.'}</EmptyState> : <div className="trace-scroll">
+        {isLoadingList ? <EmptyState>Loading requests...</EmptyState> : listError ? <EmptyState>Request list could not be loaded.</EmptyState> : !hasRows ? <EmptyState><Activity size={20} className="mx-auto mb-2 text-purple" />{searchTerm ? 'No traces match this search.' : 'No requests/traces for this app and period.'}</EmptyState> : <div className="trace-scroll">
           {canInspectTrace ? pageSummaries.map((summary) => <button className={summary.id === selectedTraceId ? 'trace-card w-full active' : 'trace-card w-full'} key={summary.id} onClick={() => selectTrace(summary.id)}>
             <div className="trace-card-top">
               <div><strong className="trace-card-name">{text(summary.agent)}</strong><div className="trace-card-meta">{summary.spanCount} call{summary.spanCount === 1 ? '' : 's'} · {(summary.duration / 1000).toFixed(1)}s</div></div>
@@ -82,7 +82,7 @@ export function TraceExplorerPage({ params, canInspectTrace, initialTraceId, onO
       </div>
       <div className="trace-detail">
         <SectionTitle title="Span Details" detail="Metadata only unless payload access is allowed" />
-        {!selectedSpan ? <EmptyState>Choose a span to inspect details.</EmptyState> : <>
+        {!selectedSpan ? <EmptyState><Layers size={18} className="mx-auto mb-2 text-purple" />Choose a span to inspect details.</EmptyState> : <>
           <div className="detail-tabs"><button className={detailTab === 'summary' ? 'active' : ''} onClick={() => setDetailTab('summary')}>Summary</button><button className={detailTab === 'cost' ? 'active' : ''} onClick={() => setDetailTab('cost')}>Cost</button><button className={detailTab === 'payload' ? 'active' : ''} onClick={() => setDetailTab('payload')}>Payload</button><button className={detailTab === 'metadata' ? 'active' : ''} onClick={() => setDetailTab('metadata')}>Metadata</button></div>
           {detailTab === 'summary' && <div className="list"><div className="list-row"><span>Status</span><strong>{text(selectedSpan.span_status)}</strong></div><div className="list-row"><span>Started</span><strong>{selectedSpan.span_started_at ? new Date(selectedSpan.span_started_at).toLocaleString() : '—'}</strong></div><div className="list-row"><span>Duration</span><strong>{selectedSpan.span_duration_ms == null ? 'Not captured' : `${selectedSpan.span_duration_ms} ms`}</strong></div><div className="list-row"><span>Sequence</span><strong>{text(selectedSpan.sequence_order)}</strong></div><div className="list-row"><span>Cost</span><strong>{money(numeric(selectedSpan, 'calculated_cost'))}</strong></div></div>}
           {detailTab === 'cost' && <div className="list"><div className="list-row"><span>Calculated Cost</span><strong>{money(numeric(selectedSpan, 'calculated_cost'))}</strong></div><div className="list-row"><span>Request Bytes</span><strong>{text(selectedSpan.request_bytes)}</strong></div><div className="list-row"><span>Response Bytes</span><strong>{text(selectedSpan.response_bytes)}</strong></div></div>}

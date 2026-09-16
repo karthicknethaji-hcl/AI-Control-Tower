@@ -537,7 +537,7 @@ BEGIN
 
   INSERT INTO public.mt_apps (app_id, name, supports_enforcement)
   VALUES (v_app_id, trim(p_display_name), false)
-  ON CONFLICT (app_id) DO UPDATE
+  ON CONFLICT ON CONSTRAINT mt_apps_pkey DO UPDATE
     SET name = EXCLUDED.name;
 
   INSERT INTO public.mt_company_apps (
@@ -566,7 +566,7 @@ BEGIN
     null,
     null
   )
-  ON CONFLICT (company_id, app_id) DO UPDATE
+  ON CONFLICT ON CONSTRAINT mt_company_apps_pkey DO UPDATE
     SET is_active = true,
         granted_at = now(),
         granted_by = p_actor_user_id,

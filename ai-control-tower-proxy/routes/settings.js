@@ -8,8 +8,9 @@ function rpcFailure(res, error) {
   if (/credential already exists/i.test(message)) return res.status(409).json({ error: { type: 'conflict', message: 'A credential already exists. Rotate it instead.' } });
   if (/no active credential/i.test(message)) return res.status(409).json({ error: { type: 'conflict', message: 'No active credential exists. Issue one first.' } });
   if (/payload capture requires/i.test(message)) return res.status(400).json({ error: { type: 'invalid_request', message: 'Payload capture requires payload write scope.' } });
-  console.error('[CONTROL TOWER] Settings RPC failed:', message);
-  return res.status(503).json({ error: { type: 'server_error', message: 'Settings operation is unavailable.' } });
+  console.error('[CONTROL TOWER] Settings RPC failed:', error && error.code ? error.code : 'unknown', message);
+  const detail = process.env.NODE_ENV === 'production' ? 'Settings operation is unavailable.' : `Settings operation is unavailable: ${message || 'the Settings RPC returned an error.'}`;
+  return res.status(503).json({ error: { type: 'server_error', message: detail } });
 }
 
 function validExpiry(body) {
@@ -19,6 +20,12 @@ function validExpiry(body) {
 
 module.exports = function createSettingsRouter(supabaseAdmin, apiReferenceUrl) {
   const router = express.Router();
+  router.use((req, res, next) => {
+    if (!supabaseAdmin && req.path !== '/api-reference') {
+      return res.status(503).json({ error: { type: 'server_error', message: 'Control Tower proxy is missing SUPABASE_SERVICE_ROLE_KEY.' } });
+    }
+    next();
+  });
 
   router.get('/apps', async (req, res) => {
     const { data, error } = await supabaseAdmin.rpc('self_service_app_connections_list', { p_actor_user_id: req.user.id, p_company_id: req.companyId });

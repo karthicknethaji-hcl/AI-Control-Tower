@@ -20,3 +20,17 @@ export function SectionTitle({ title, detail }: { title: string; detail?: string
 export function EmptyState({ children }: PropsWithChildren) {
   return <div className="rounded-control border border-dashed border-line bg-soft px-4 py-8 text-center text-[11px] font-bold text-muted">{children}</div>;
 }
+
+export function ConfirmDialog({ title, message, confirmLabel = 'Continue', danger, busy, onConfirm, onCancel }: { title: string; message: string; confirmLabel?: string; danger?: boolean; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return <div className="drawer-backdrop" onClick={onCancel}>
+    <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <h3 className={danger ? 'text-[16px] font-black text-red' : 'text-[16px] font-black text-ink'}>{title}</h3>
+      <p className="mt-2 text-[12px] font-semibold leading-6 text-muted">{message}</p>
+      <div className="modal-actions">
+        <Button onClick={onCancel}>Cancel</Button>
+        <Button className={danger ? 'border-red bg-red text-white hover:opacity-90' : 'border-purple bg-purple text-white hover:opacity-90'} disabled={busy} onClick={onConfirm}>{confirmLabel}</Button>
+      </div>
+    </div>
+  </div>;
+}
+
