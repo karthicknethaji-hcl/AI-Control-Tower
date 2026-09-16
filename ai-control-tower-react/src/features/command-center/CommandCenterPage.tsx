@@ -19,7 +19,10 @@ function numeric(row: Record<string, unknown> | undefined, ...keys: string[]) {
 function summaryValue(row: CostSummaryRow, ...keys: string[]) { return numeric(row as Record<string, unknown>, ...keys); }
 function rowLabel(row: Record<string, unknown>) { return String(row.label ?? row.group_key1 ?? row.feature ?? row.name ?? row.key ?? 'Unlabelled'); }
 function rowCost(row: Record<string, unknown>) { return numeric(row, 'total_cost_usd', 'cost_usd', 'cost', 'calculated_cost'); }
+function rowInputCost(row: Record<string, unknown>) { return numeric(row, 'group_input_cost'); }
+function rowOutputCost(row: Record<string, unknown>) { return numeric(row, 'group_output_cost'); }
 function sumCosts(rows: Array<Record<string, unknown>>) { if (!rows.length) return 0; const costs = rows.map(rowCost); return costs.every((value) => value !== undefined) ? costs.reduce((total, value) => total + (value ?? 0), 0) : undefined; }
+function sumField(rows: Array<Record<string, unknown>>, fn: (row: Record<string, unknown>) => number | undefined) { if (!rows.length) return 0; const values = rows.map(fn); return values.every((value) => value !== undefined) ? values.reduce((total, value) => total + (value ?? 0), 0) : undefined; }
 
 function QueryState({ isLoading, error, empty, children }: { isLoading: boolean; error: unknown; empty: boolean; children: React.ReactNode }) {
   if (isLoading) return <EmptyState>Loading live data...</EmptyState>;
@@ -109,6 +112,12 @@ export function CommandCenterPage({ params, onOpen, canViewGovernance, onNavigat
   const unpricedCalls = summaryValue(row, 'unpriced_calls', 'unpriced_call_count');
   const outcomeSpend = outcomeGrouped.isLoading || outcomeGrouped.error ? undefined : sumCosts(outcomeGrouped.data ?? []);
   const unattributedSpend = totalSpend !== undefined && outcomeSpend !== undefined ? totalSpend - outcomeSpend : undefined;
+  const outcomeInputCost = outcomeGrouped.isLoading || outcomeGrouped.error ? undefined : sumField(outcomeGrouped.data ?? [], rowInputCost);
+  const outcomeOutputCost = outcomeGrouped.isLoading || outcomeGrouped.error ? undefined : sumField(outcomeGrouped.data ?? [], rowOutputCost);
+  const unattributedInputCost = inputCost !== undefined && outcomeInputCost !== undefined ? inputCost - outcomeInputCost : undefined;
+  const unattributedOutputCost = outputCost !== undefined && outcomeOutputCost !== undefined ? outputCost - outcomeOutputCost : undefined;
+  const averageInputCost = inputCost !== undefined && callCount !== undefined && callCount > 0 ? inputCost / callCount : undefined;
+  const averageOutputCost = outputCost !== undefined && callCount !== undefined && callCount > 0 ? outputCost / callCount : undefined;
   const budgetAmount = numeric(budget.data as Record<string, unknown> | undefined, 'amount');
   const budgetUsedPct = budgetAmount && totalSpend !== undefined && budgetAmount > 0 ? (totalSpend / budgetAmount) * 100 : undefined;
   const activeAlertCount = canViewGovernance ? alerts.data?.length ?? 0 : undefined;
@@ -218,8 +227,20 @@ export function CommandCenterPage({ params, onOpen, canViewGovernance, onNavigat
         breakdown={inputCost !== undefined || outputCost !== undefined ? { inLabel: 'In', inValue: money(inputCost), outLabel: 'Out', outValue: money(outputCost) } : undefined}
       />
       <MetricCard label="Budget Used" value={budgetUsedPct === undefined ? '—' : `${budgetUsedPct.toFixed(0)}%`} detail={budgetAmount === undefined ? 'No active budget configured' : `Of ${money(budgetAmount)} budget`} tone={budgetUsedPct !== undefined && budgetUsedPct >= 90 ? 'red' : budgetUsedPct !== undefined && budgetUsedPct >= 75 ? 'amber' : 'green'} />
-      <MetricCard label="Outcome-Attributed Spend" value={money(outcomeSpend)} detail="Outcome-type grouping" tone="purple" />
-      <MetricCard label="Outcome-Unattributed Spend" value={money(unattributedSpend)} detail="Total less attributed" tone="amber" />
+      <MetricCard
+        label="Outcome-Attributed Spend"
+        value={money(outcomeSpend)}
+        detail="Outcome-type grouping"
+        tone="purple"
+        breakdown={outcomeInputCost !== undefined || outcomeOutputCost !== undefined ? { inLabel: 'In', inValue: money(outcomeInputCost), outLabel: 'Out', outValue: money(outcomeOutputCost) } : undefined}
+      />
+      <MetricCard
+        label="Outcome-Unattributed Spend"
+        value={money(unattributedSpend)}
+        detail="Total less attributed"
+        tone="amber"
+        breakdown={unattributedInputCost !== undefined || unattributedOutputCost !== undefined ? { inLabel: 'In', inValue: money(unattributedInputCost), outLabel: 'Out', outValue: money(unattributedOutputCost) } : undefined}
+      />
       <MetricCard label="Pricing Match" value={pricingMatch === undefined ? '—' : `${pricingMatch.toFixed(1)}%`} detail={`${compactNumber(unpricedCalls)} unpriced calls`} tone="green" />
     </div>
 
@@ -231,7 +252,13 @@ export function CommandCenterPage({ params, onOpen, canViewGovernance, onNavigat
         tone="blue"
         breakdown={inputTokens !== undefined || outputTokens !== undefined ? { inLabel: 'In', inValue: compactNumber(inputTokens), outLabel: 'Out', outValue: compactNumber(outputTokens) } : undefined}
       />
-      <MetricCard label="Average Cost / Call" value={money(averageCost)} detail="Total spend / total calls" tone="purple" />
+      <MetricCard
+        label="Average Cost / Call"
+        value={money(averageCost)}
+        detail="Total spend / total calls"
+        tone="purple"
+        breakdown={averageInputCost !== undefined || averageOutputCost !== undefined ? { inLabel: 'In', inValue: money(averageInputCost), outLabel: 'Out', outValue: money(averageOutputCost) } : undefined}
+      />
       <MetricCard label="AI Calls" value={compactNumber(callCount)} detail="Across producer apps" tone="blue" />
       <MetricCard label="Active Alerts" value={canViewGovernance ? compactNumber(activeAlertCount) : '—'} detail={canViewGovernance ? 'Governance alerts' : 'Restricted for readonly users'} tone="red" />
     </div>

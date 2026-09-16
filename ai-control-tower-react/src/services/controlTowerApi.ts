@@ -34,6 +34,8 @@ export interface GroupedCostRow {
   cost?: number | string | null;
   total_cost_usd?: number | string | null;
   cost_usd?: number | string | null;
+  group_input_cost?: number | string | null;
+  group_output_cost?: number | string | null;
   [key: string]: unknown;
 }
 
