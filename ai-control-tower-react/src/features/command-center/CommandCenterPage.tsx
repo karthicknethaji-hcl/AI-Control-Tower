@@ -101,6 +101,8 @@ export function CommandCenterPage({ params, onOpen, canViewGovernance, onNavigat
     : summaryValue(row, 'total_tokens');
   const inputTokens = summaryValue(row, 'total_input_tokens');
   const outputTokens = summaryValue(row, 'total_output_tokens');
+  const inputCost = summaryValue(row, 'total_input_cost');
+  const outputCost = summaryValue(row, 'total_output_cost');
   const averageCost = totalSpend !== undefined && callCount !== undefined && callCount > 0 ? totalSpend / callCount : undefined;
   const pricedCalls = summaryValue(row, 'priced_calls');
   const pricingMatch = pricedCalls !== undefined && callCount !== undefined && callCount > 0 ? (pricedCalls / callCount) * 100 : undefined;
@@ -208,11 +210,17 @@ export function CommandCenterPage({ params, onOpen, canViewGovernance, onNavigat
     </div>
 
     <div className="metric-grid five">
-      <MetricCard label="Outcome-Attributed Spend" value={money(outcomeSpend)} detail="Outcome-type grouping" tone="purple" />
-      <MetricCard label="Total AI Spend" value={money(totalSpend)} detail={summary.isLoading ? 'Loading summary...' : `${compactNumber(callCount)} calls this period`} tone="blue" />
+      <MetricCard
+        label="Total AI Spend"
+        value={money(totalSpend)}
+        detail={summary.isLoading ? 'Loading summary...' : `${compactNumber(callCount)} calls this period`}
+        tone="blue"
+        breakdown={inputCost !== undefined || outputCost !== undefined ? { inLabel: 'In', inValue: money(inputCost), outLabel: 'Out', outValue: money(outputCost) } : undefined}
+      />
       <MetricCard label="Budget Used" value={budgetUsedPct === undefined ? '—' : `${budgetUsedPct.toFixed(0)}%`} detail={budgetAmount === undefined ? 'No active budget configured' : `Of ${money(budgetAmount)} budget`} tone={budgetUsedPct !== undefined && budgetUsedPct >= 90 ? 'red' : budgetUsedPct !== undefined && budgetUsedPct >= 75 ? 'amber' : 'green'} />
-      <MetricCard label="Pricing Match" value={pricingMatch === undefined ? '—' : `${pricingMatch.toFixed(1)}%`} detail={`${compactNumber(unpricedCalls)} unpriced calls`} tone="green" />
+      <MetricCard label="Outcome-Attributed Spend" value={money(outcomeSpend)} detail="Outcome-type grouping" tone="purple" />
       <MetricCard label="Outcome-Unattributed Spend" value={money(unattributedSpend)} detail="Total less attributed" tone="amber" />
+      <MetricCard label="Pricing Match" value={pricingMatch === undefined ? '—' : `${pricingMatch.toFixed(1)}%`} detail={`${compactNumber(unpricedCalls)} unpriced calls`} tone="green" />
     </div>
 
     <div className="metric-grid four">

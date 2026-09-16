@@ -11,6 +11,8 @@ export interface CostSummaryRow {
   total_tokens?: number | string | null;
   total_input_tokens?: number | string | null;
   total_output_tokens?: number | string | null;
+  total_input_cost?: number | string | null;
+  total_output_cost?: number | string | null;
   priced_calls?: number | string | null;
   unpriced_call_count?: number | string | null;
   unpriced_calls?: number | string | null;
