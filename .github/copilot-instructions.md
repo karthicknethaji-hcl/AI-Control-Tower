@@ -72,3 +72,28 @@ Before editing files, inspect the repo and return a short implementation plan wi
 - validation commands to run
 
 Do not start coding until that plan is produced.
+
+## Database diagnostics with PostgreSQL tools
+
+**Important:** Deferred tools (like `pgsql_connect`, `pgsql_query`, etc.) are NOT automatically available in new chat sessions. Each session starts fresh without them loaded.
+
+**To access Supabase PostgreSQL diagnostics in a new session:**
+
+1. Start your message with: `tool_search("PostgreSQL database connection query")`
+2. This loads all available `pgsql_*` tools (connect, query, list_connection_profiles, db_context, etc.)
+3. Once loaded, use them to diagnose RPC definitions, schema, and data via the **Supabase-Personal** connection profile
+
+**Available connection profiles:**
+- `Supabase-Personal` (profileId: `F5B1B0A9-FAFF-44D2-B09D-ACBD42A74E81`) — connects to real Supabase project; use this for actual diagnostics
+- `PS-Dev` (unrelated Azure database; avoid unless explicitly needed)
+
+**Confirmed RPC contracts to preserve** — do not rename or change behavior without explicit approval:
+- `mt_company_apps_list`, `mt_ai_cost_summary`, `mt_ai_cost_grouped`, `mt_ai_cost_by_agent`, `mt_ai_cost_events_list`, `mt_ai_cost_top_calls`
+- `mt_ai_trace_detail_list`, `mt_ai_trace_payload_get`
+- `mt_outcome_types_list`, `mt_outcomes_list`
+- `mt_ai_budget_get_active`, `mt_ai_budget_upsert`
+- `mt_ai_alerts_list`, `mt_ai_alert_acknowledge`, `mt_ai_alert_dismiss`
+- `mt_ai_cost_opportunities`, `mt_ai_cost_opportunity_supporting_calls`
+- `mt_ai_record_usage_event_with_span`, `mt_ai_record_tool_span`
+
+See `sql/README.md` and `.github/instructions/ai-control-tower.instructions.md` for data model details.
