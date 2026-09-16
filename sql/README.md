@@ -11,13 +11,9 @@
 
 The application does not execute this file and must not assume the migration is applied. Until it is applied, the new Settings routes return an unavailable response from the missing RPCs; existing ingestion authentication retains its legacy fallback behavior.
 
-If the original migration was already applied before the `app_id` qualification fix, run `20260916_ai_control_tower_settings_fix_ambiguous_app_id.sql` in pgt-dev. It replaces only `self_service_register_app`; no table changes are required.
+**Resolved (2026-09-16):** the `column reference "app_id" is ambiguous` error on "Connect app" was NOT a qualification issue (that was a red herring). The real cause was `self_service_register_app`'s `INSERT ... ON CONFLICT (app_id)` / `ON CONFLICT (company_id, app_id)` — a plpgsql `RETURNS TABLE(app_id ...)` OUT-parameter collides with a bare column name inside an `ON CONFLICT` target list, and that list can't be table-qualified. Fixed by switching to `ON CONFLICT ON CONSTRAINT mt_apps_pkey` / `ON CONFLICT ON CONSTRAINT mt_company_apps_pkey`. This fix is applied in `20260916_ai_control_tower_settings.sql` and has been verified working end-to-end against pgt-dev. (The narrower companion patch file that previously existed for this fix has been deleted — it's fully superseded by the main migration file.)
 
-**Confirmed live bug (2026-09-16):** `self_service_register_app` in pgt-dev is still throwing `column reference "app_id" is ambiguous` when calling "Connect app" from the Settings UI. The function body committed in this repo (both migration files) is already fully qualified (`ca.app_id` / `v_app_id`), so this is not a code defect — the version currently deployed to pgt-dev predates the qualification fix and was never re-applied. There is no automated migration runner and no reachable direct-Postgres tool in this workspace, so this must be run manually:
-
-1. Open the Supabase SQL Editor for the pgt-dev project (`enozfttaoxhomesdonrc`).
-2. Run `20260916_ai_control_tower_settings.sql` in full again — it is idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`, re-issued `REVOKE`/`GRANT`) and will overwrite every self-service function, not just `self_service_register_app`, closing off the same ambiguity risk in any other function that may also still be stale.
-3. Re-test "Connect app" from Settings; the 503 should be gone.
+**Latest file to run in production:** `20260916_ai_control_tower_settings.sql` — it is the single, complete, current migration (lifecycle columns + all eight self-service functions, including the `ON CONFLICT ON CONSTRAINT` fix) and is idempotent, so it's safe to run even though pgt-dev already has these objects from earlier partial runs. There is no other SQL file to run.
 
 ## Required dev verification
 
