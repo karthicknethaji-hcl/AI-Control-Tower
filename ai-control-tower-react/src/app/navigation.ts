@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Home, ShieldCheck, Target, type LucideIcon } from 'lucide-react';
+import { Activity, BarChart3, Home, Target, type LucideIcon } from 'lucide-react';
 import type { NavKey } from '../types';
 
 export interface NavigationItem { key: NavKey; label: string; sub: string; icon: LucideIcon; }
@@ -8,7 +8,6 @@ export const navItems: NavigationItem[] = [
   { key: 'outcomes', label: 'Outcome Economics', sub: 'Cost per outcome', icon: Target },
   { key: 'cost', label: 'Cost Analytics', sub: 'Drivers and quality', icon: BarChart3 },
   { key: 'traces', label: 'Trace Explorer', sub: 'Requests, spans, payloads', icon: Activity },
-  { key: 'governance', label: 'Governance', sub: 'Budget and controls', icon: ShieldCheck },
 ];
 
 export const CUSTOM_RANGE_OPTION = 'Custom Range...';

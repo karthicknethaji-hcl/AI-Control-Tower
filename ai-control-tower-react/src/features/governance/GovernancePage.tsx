@@ -32,7 +32,7 @@ function WhatIfDialog({ open, onClose }: { open: boolean; onClose: () => void })
   </div>;
 }
 
-export function GovernancePage({ params, onOpen: _onOpen }: { params: RpcParams; onOpen: (title: string, content?: ReactNode) => void }) {
+export function GovernancePage({ params, onOpen: _onOpen, hideIntro = false }: { params: RpcParams; onOpen: (title: string, content?: ReactNode) => void; hideIntro?: boolean }) {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [whatIfOpen, setWhatIfOpen] = useState(false);
   const client = useQueryClient();
@@ -48,12 +48,12 @@ export function GovernancePage({ params, onOpen: _onOpen }: { params: RpcParams;
   const alertRows = alerts.data ?? [];
 
   return <>
-    <div className="page-intro">
+    {!hideIntro && <div className="page-intro">
       <div>
         <Badge className="bg-amberP text-amber">Admin and Member Access</Badge>
         <p>Budget posture analysis, alert responses, and enforcement decisions for this app.</p>
       </div>
-    </div>
+    </div>}
 
     <div className="hero">
       <Card className="panel">

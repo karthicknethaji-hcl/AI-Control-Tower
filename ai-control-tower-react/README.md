@@ -29,6 +29,7 @@ Never commit `.env.local`.
 - Cost Analytics
 - Trace Explorer
 - Governance
+- Settings: App connections and Budget & alerts
 
 ## RPC-backed capabilities
 
@@ -42,6 +43,10 @@ The app uses the existing Supabase RPC contracts for company/app bootstrap, cost
 - Multiple producer apps and period switching were validated.
 - Trace/span and Governance drawers were opened without executing persistent mutations.
 - No protected Product Studio files changed.
+
+## Settings backend dependency
+
+The Settings app-connection actions use the authenticated proxy routes and the SQL migration in `../sql/20260916_ai_control_tower_settings.sql`. Apply that migration to pgt-dev and run its verification queries before testing registration, scope changes, credential lifecycle actions, or disconnect. This app does not execute SQL automatically.
 
 ## Known limitations
 

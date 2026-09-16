@@ -1,5 +1,6 @@
-import type { CompanyApp, RpcParams } from '../types';
+import type { CaptureConfigInput, CompanyApp, ConnectedApp, RpcParams } from '../types';
 import { getSupabase } from '../lib/supabase';
+import { getEnv } from '../lib/env';
 import { money } from '../lib/utils';
 
 export interface CostSummaryRow {
@@ -343,4 +344,75 @@ export async function getOutcomes(params: RpcParams): Promise<OutcomeRow[]> {
     p_company_id: params.companyId, p_app_id: params.appId,
     p_period_start: params.periodStart, p_period_end: params.periodEnd,
   });
+}
+
+async function settingsRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const session = (await getSupabase().auth.getSession()).data.session;
+  if (!session?.access_token) throw new Error('Your session has expired. Sign in again.');
+  const env = getEnv();
+  const response = await fetch(`${env.apiBaseUrl ?? ''}/api/control-tower/settings${path}`, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': session.access_token, ...(options.headers ?? {}) },
+  });
+  const body = await response.json() as T & { error?: { message?: string } };
+  if (!response.ok) throw new Error(body.error?.message ?? 'Settings request failed.');
+  return body;
+}
+
+function mapConnectedApp(row: Record<string, unknown>): ConnectedApp {
+  return {
+    appId: String(row.app_id ?? ''), name: String(row.name ?? 'Unnamed app'), isActive: Boolean(row.is_active),
+    grantedAt: String(row.granted_at ?? ''), supportsEnforcement: Boolean(row.supports_enforcement),
+    controlMode: row.control_mode === 'enforceable' ? 'enforceable' : 'monitor_only',
+    hasCredential: Boolean(row.has_credential),
+    credentialStatus: row.credential_status === 'active' || row.credential_status === 'expired' ? row.credential_status : 'not_issued',
+    credentialCreatedAt: row.credential_created_at ? String(row.credential_created_at) : null,
+    credentialLastUsedAt: row.credential_last_used_at ? String(row.credential_last_used_at) : null,
+    credentialExpiresAt: row.credential_expires_at ? String(row.credential_expires_at) : null,
+    credentialRevokedAt: row.credential_revoked_at ? String(row.credential_revoked_at) : null,
+    scopeUsageWrite: Boolean(row.scope_usage_write), scopeTracesWrite: Boolean(row.scope_traces_write),
+    scopePayloadsWrite: Boolean(row.scope_payloads_write), payloadCaptureEnabled: Boolean(row.payload_capture_enabled),
+  };
+}
+
+export async function listConnectedApps(companyId: string): Promise<ConnectedApp[]> {
+  const response = await settingsRequest<{ apps: Record<string, unknown>[] }>('/apps', { headers: { 'X-Company-Id': companyId } });
+  return (response.apps ?? []).map(mapConnectedApp);
+}
+
+export async function connectApp(companyId: string, displayName: string): Promise<{ appId: string; name: string }> {
+  const response = await settingsRequest<{ app: { appId: string; name: string } }>('/apps', {
+    method: 'POST', headers: { 'X-Company-Id': companyId }, body: JSON.stringify({ displayName }),
+  });
+  return response.app;
+}
+
+export async function updateCaptureConfig(companyId: string, appId: string, input: CaptureConfigInput): Promise<CaptureConfigInput> {
+  const response = await settingsRequest<{ scopeUsageWrite: boolean; scopeTracesWrite: boolean; scopePayloadsWrite: boolean; payloadCaptureEnabled: boolean }>(`/apps/${encodeURIComponent(appId)}/capture`, {
+    method: 'PATCH', headers: { 'X-Company-Id': companyId }, body: JSON.stringify(input),
+  });
+  return response;
+}
+
+export interface IssueCredentialResponse { appId: string; credential: string; shownOnce: true; message: string; }
+export interface RevokeCredentialResponse { appId: string; hasCredential: boolean; credentialRevokedAt: string; }
+export interface DisconnectAppResponse { appId: string; isActive: false; disconnectedAt: string; }
+
+export async function issueCredential(companyId: string, appId: string, expiresAt: string | null = null): Promise<IssueCredentialResponse> {
+  return settingsRequest<IssueCredentialResponse>(`/apps/${encodeURIComponent(appId)}/credentials/issue`, { method: 'POST', headers: { 'X-Company-Id': companyId }, body: JSON.stringify({ expiresAt }) });
+}
+export async function rotateCredential(companyId: string, appId: string, expiresAt: string | null = null): Promise<IssueCredentialResponse> {
+  return settingsRequest<IssueCredentialResponse>(`/apps/${encodeURIComponent(appId)}/credentials/rotate`, { method: 'POST', headers: { 'X-Company-Id': companyId }, body: JSON.stringify({ expiresAt }) });
+}
+export async function revokeCredential(companyId: string, appId: string): Promise<RevokeCredentialResponse> {
+  return settingsRequest<RevokeCredentialResponse>(`/apps/${encodeURIComponent(appId)}/credentials/revoke`, { method: 'POST', headers: { 'X-Company-Id': companyId } });
+}
+export async function disconnectApp(companyId: string, appId: string): Promise<DisconnectAppResponse> {
+  return settingsRequest<DisconnectAppResponse>(`/apps/${encodeURIComponent(appId)}/disconnect`, { method: 'POST', headers: { 'X-Company-Id': companyId } });
+}
+export async function getApiReferenceUrl(companyId: string): Promise<string> {
+  const configured = getEnv().apiReferenceUrl;
+  if (configured) return configured;
+  const response = await settingsRequest<{ url: string }>('/api-reference', { headers: { 'X-Company-Id': companyId } });
+  return response.url;
 }
