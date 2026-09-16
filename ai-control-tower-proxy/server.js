@@ -8,6 +8,7 @@ const { createAuthMiddleware } = require('./middleware/requireAuth');
 const { createCompanyAdminMiddleware } = require('./middleware/requireCompanyAdmin');
 const apiKeyAuth = require('./middleware/apiKeyAuth');
 const createSettingsRouter = require('./routes/settings');
+const createModelPricingRouter = require('./routes/modelPricing');
 const usageEventsRouter = require('./routes/v1/usageEvents');
 const outcomesRouter = require('./routes/v1/outcomes');
 const outcomeTypesRouter = require('./routes/v1/outcomeTypes');
@@ -69,6 +70,16 @@ app.use('/api/control-tower/settings', express.json({ limit: '20kb' }));
 app.use('/api/control-tower/settings', createAuthMiddleware(supabaseUrl));
 app.use('/api/control-tower/settings', createCompanyAdminMiddleware(supabaseAdmin));
 app.use('/api/control-tower/settings', createSettingsRouter(supabaseAdmin, apiReferenceUrl));
+
+// ── AI Cost Control Tower: Model Pricing (read-only, global catalog) ────────
+// Deliberately its own mount, not nested under /api/control-tower/settings —
+// that stack requires company-admin + X-Company-Id, but mt_model_pricing has
+// no company_id column, so any authenticated user can read it here.
+const modelPricingLimiter = rateLimit({ windowMs: 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+app.options('/api/control-tower/model-pricing*', cors({ origin: allowedOrigins }));
+app.use('/api/control-tower/model-pricing', modelPricingLimiter);
+app.use('/api/control-tower/model-pricing', createAuthMiddleware(supabaseUrl));
+app.use('/api/control-tower/model-pricing', createModelPricingRouter(supabaseAdmin));
 
 // ── Unified, auto-generated OpenAPI docs (/docs) ─────────────────────────────
 // Every path/schema below is built from @openapi JSDoc blocks above each

@@ -79,7 +79,15 @@ curl -X POST https://<this-proxy-host>/v1/usage-events \\
     { name: 'tool-spans', description: 'Record a tool-call step, with or without an LLM call.' },
     { name: 'trace-payloads', description: "Capture and read back a usage event's raw request/response content (gated)." },
     { name: 'company-apps', description: 'Self-check on the calling credential.' },
-    { name: 'settings', description: 'Internal Settings API used by the AI Control Tower React app (Supabase JWT auth, not Bearer API key).' }
+    { name: 'settings', description: 'Internal Settings API used by the AI Control Tower React app (Supabase JWT auth, not Bearer API key).' },
+    { name: 'model-pricing', description: 'Read-only global model pricing catalog (not company-scoped).' }
+  ],
+  // ReDoc left-nav grouping — every tag above must appear in exactly one
+  // group below, or it silently disappears from the /docs nav.
+  'x-tagGroups': [
+    { name: 'Configuration', tags: ['settings', 'company-apps', 'model-pricing'] },
+    { name: 'Usage & Traces', tags: ['usage-events', 'traces', 'tool-spans', 'trace-payloads'] },
+    { name: 'Outcomes', tags: ['outcomes', 'outcome-types'] }
   ],
   components: {
     securitySchemes: {
