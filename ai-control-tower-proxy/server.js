@@ -20,10 +20,16 @@ const tracePayloadsRouter = require('./routes/v1/tracePayloads');
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// Data-plane client target: defaults to SUPABASE_URL (personal repo, unchanged
+// behavior). The enterprise deploy overrides this to a self-hosted PostgREST
+// instance in front of the Azure control-tower DB, while SUPABASE_URL stays
+// pointed at the real Supabase project so requireAuth's JWKS lookup below is
+// unaffected — user auth stays on Supabase Auth regardless of data backend.
+const dataApiUrl = String(process.env.CT_DATA_API_URL || supabaseUrl || '').replace(/\/+$/, '');
+const serviceRoleKey = process.env.CT_DATA_API_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const allowedOrigins = (process.env.ALLOWED_ORIGIN || 'http://127.0.0.1:5174,http://localhost:5174').split(',').map((origin) => origin.trim()).filter(Boolean);
 const apiReferenceUrl = String(process.env.CT_API_REFERENCE_URL || '').trim();
-const supabaseAdmin = supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+const supabaseAdmin = dataApiUrl && serviceRoleKey ? createClient(dataApiUrl, serviceRoleKey) : null;
 const RATE_LIMIT_MAX = 100; // requests per window per IP, matches the ported /v1 ingestion contract
 const RATE_LIMIT_WINDOW_MIN = 1;
 
@@ -105,6 +111,7 @@ app.use('/docs', express.static(path.join(__dirname, 'openapi'), { index: 'docs.
 app.use((req, res) => res.status(404).json({ error: { type: 'not_found', message: `Route not found: ${req.method} ${req.path}` } }));
 
 if (!supabaseUrl) console.warn('[CONTROL TOWER] SUPABASE_URL is not set.');
-if (!serviceRoleKey) console.warn('[CONTROL TOWER] SUPABASE_SERVICE_ROLE_KEY is not set. Settings data routes will be unavailable.');
+if (!dataApiUrl) console.warn('[CONTROL TOWER] CT_DATA_API_URL/SUPABASE_URL is not set.');
+if (!serviceRoleKey) console.warn('[CONTROL TOWER] CT_DATA_API_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY is not set. Settings data routes will be unavailable.');
 if (!apiReferenceUrl) console.warn('[CONTROL TOWER] CT_API_REFERENCE_URL is not set.');
 app.listen(port, () => console.log(`[CONTROL TOWER] Proxy listening on http://127.0.0.1:${port}`));
