@@ -33,6 +33,11 @@ const supabaseAdmin = dataApiUrl && serviceRoleKey ? createClient(dataApiUrl, se
 const RATE_LIMIT_MAX = 100; // requests per window per IP, matches the ported /v1 ingestion contract
 const RATE_LIMIT_WINDOW_MIN = 1;
 
+// Hosted behind a reverse proxy (Render, etc.) that sets X-Forwarded-For.
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// and all callers share the proxy's IP. Trust exactly one hop.
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
+
 app.use(cors({ origin: allowedOrigins, credentials: false }));
 app.get('/', (req, res) => res.json({ status: 'ok', service: 'ai-control-tower-proxy' }));
 
