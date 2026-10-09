@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const swaggerJsdoc = require('swagger-jsdoc');
+const { parsePublicBaseUrl, resolveServers } = require('./openapi/servers');
 const { createClient } = require('@supabase/supabase-js');
 const { createAuthMiddleware } = require('./middleware/requireAuth');
 const { createCompanyAdminMiddleware } = require('./middleware/requireCompanyAdmin');
@@ -103,7 +104,24 @@ const openApiSpec = swaggerJsdoc({
   // resolve Windows backslash paths from path.join() on Windows hosts.
   apis: [__dirname.replace(/\\/g, '/') + '/routes/**/*.js']
 });
-app.get('/docs/openapi.json', (req, res) => res.json(openApiSpec));
+// `servers` is resolved per request so sample URLs always point at the host
+// serving the docs (local, Render, or any future host) — see openapi/servers.js.
+// Requires `trust proxy` for correct https/host behind a reverse proxy. Set
+// PUBLIC_BASE_URL (full URL incl. https://) to pin it, e.g. when a gateway
+// rewrites the Host header. Recommended in production, since Host is
+// otherwise client-controlled.
+const publicBaseUrl = parsePublicBaseUrl(process.env.PUBLIC_BASE_URL);
+if (process.env.PUBLIC_BASE_URL && !publicBaseUrl) {
+  console.warn('[CONTROL TOWER] PUBLIC_BASE_URL is invalid (must be http(s)://host[:port]); ignoring it.');
+}
+app.get('/docs/openapi.json', (req, res) => {
+  // Response depends on the request host, so it must not be shared-cached.
+  res.set('Cache-Control', 'no-store');
+  res.vary('Host');
+  res.vary('X-Forwarded-Host');
+  res.vary('X-Forwarded-Proto');
+  res.json({ ...openApiSpec, servers: resolveServers(req, { publicBaseUrl, fallbackPort: port }) });
+});
 // Deliberately app.use (not app.get) — bare /docs vs /docs/ must be
 // distinguishable so the redirect below can't loop on itself (Express's
 // default non-strict routing treats them as the same route under app.get).
