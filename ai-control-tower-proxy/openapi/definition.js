@@ -17,7 +17,7 @@ module.exports = {
     description: `
 ## Getting started
 
-This API lets an internal HCLTech application write its own AI usage and
+This API lets an internal application write its own AI usage and
 outcome events into the same Cost Control Tower tables Product Studio
 already uses, so it can be traced, costed, and governed the same way. It
 also documents the Settings API this repo's own React app uses.

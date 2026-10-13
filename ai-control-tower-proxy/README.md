@@ -44,7 +44,7 @@ Settings API (Supabase JWT + company-admin auth, used only by the React app):
 - `POST /api/control-tower/settings/apps/:appId/disconnect`
 - `GET /api/control-tower/settings/api-reference`
 
-Ingestion API (Bearer API-key auth, for other internal HCLTech apps to report
+Ingestion API (Bearer API-key auth, for other internal apps to report
 AI usage/outcome/trace telemetry — ported from Product-Studio-v9.37.01/proxy):
 
 - `POST /v1/usage-events`, `GET /v1/usage-events`
